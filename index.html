@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Doomstudy</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one phone-shaped column of full-height videos, one swipe each; deck info sits beside it on wide screens. */
+:root {
+  color-scheme: dark;
+  --ink: #17141f;
+  --ink-2: #231f2e;
+  --ink-3: #322c40;
+  --black: #000;
+  --scrim: rgba(10, 8, 14, .86);
+  --text: #efeaf7;
+  --mute: #a39cb4;
+  --paper: #f6f1e4;
+  --pen: #17141f;
+  --hl-yellow: #ffe45c;
+  --hl-mint: #7ef0c1;
+  --hl-pink: #ff9bcb;
+  --hl-blue: #94c8ff;
+  --hl-orange: #ffb56b;
+  --hl-lilac: #cdb0ff;
+  --good: #14794a;
+  --bad: #c2362f;
+  --rule: rgba(23, 20, 31, .09);
+  --margin: rgba(194, 54, 47, .38);
+  --wash: rgba(246, 241, 228, .55);
+  --display: "Bricolage Grotesque", "Arial Narrow", Impact, sans-serif;
+  --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--ink); color: var(--text); font: 500 16px/1.45 var(--body); overflow: hidden; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--hl-blue); outline-offset: 2px; }
+svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { position: relative; height: 100%; display: grid; grid-template-columns: minmax(0, 300px) auto; grid-template-rows: minmax(0, 1fr); justify-content: center; gap: 36px; padding: 20px 16px; }
+.stage { position: relative; height: 100%; aspect-ratio: 9 / 16; border-radius: 28px; overflow: hidden; background: var(--black); }
+
+/* side panel */
+.side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 22px; padding-block: 8px; }
+.brand { font: 800 2.1rem/1 var(--display); letter-spacing: -.02em; margin: 0; }
+.brand span { background: var(--hl-yellow); color: var(--pen); padding: 0 .18em; border-radius: 6px; }
+.tag { margin: 6px 0 0; color: var(--mute); }
+.label { font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); margin: 0 0 8px; }
+#deckTitle { font: 800 1.35rem/1.15 var(--display); margin: 0; text-wrap: balance; }
+.concepts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.concepts li { display: grid; gap: 5px; }
+.concepts b { font-weight: 600; }
+.meter { height: 6px; border-radius: 99px; background: var(--ink-3); overflow: hidden; }
+.meter i { display: block; height: 100%; width: calc(var(--v, 0) * 100%); background: var(--hl-mint); border-radius: 99px; transition: width .4s; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
+.stats div { background: var(--ink-2); border-radius: 12px; padding: 10px; }
+.stats dt { font-size: .7rem; color: var(--mute); text-transform: uppercase; letter-spacing: .08em; }
+.stats dd { margin: 2px 0 0; font: 800 1.3rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+.tog { border: 2px solid var(--ink-3); background: none; border-radius: 99px; padding: 7px 14px; font-weight: 600; }
+.keys { color: var(--mute); font-size: .85rem; margin: 0; }
+.cta { border: 0; border-radius: 14px; background: var(--hl-yellow); color: var(--pen); font: 800 1rem/1 var(--display); padding: 13px 14px; text-align: left; }
+.cta.alt { display: block; background: none; border: 2px solid var(--hl-yellow); color: var(--text); text-decoration: none; }
+#timeline { --tl-max: 38vh; flex: none; }
+.side > * { flex-shrink: 0; }
+#timeline:empty { display: none; }
+.close { display: none; }
+
+/* hud */
+.hud { position: absolute; z-index: 7; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: 12px; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.pill { background: var(--ink); color: var(--text); border: 0; border-radius: 99px; padding: 6px 11px; font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill.icon { display: none; padding: 6px 8px; line-height: 0; }
+.bar { flex: 1; min-width: 0; height: 6px; border-radius: 99px; background: var(--ink); overflow: hidden; }
+.bar i { display: block; height: 100%; width: calc(var(--p, 0) * 100%); background: var(--paper); border-radius: 99px; }
+
+/* feed */
+.feed { position: relative; height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; overscroll-behavior: contain; }
+.feed::-webkit-scrollbar { display: none; }
+.slide { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; }
+
+/* video slides: the note above, the video in its own clear box, the controls below.
+   YouTube does not allow anything to sit in front of its player, so nothing here overlaps the box. */
+.vid { background: var(--ink-2); color: var(--text); display: grid; grid-template-rows: 142px minmax(0, 1fr) 148px; row-gap: 8px; }
+.vtop { align-self: end; padding: 0 16px; display: grid; gap: 6px; justify-items: start; }
+.vbox { position: relative; justify-self: center; height: 100%; aspect-ratio: 9 / 16; min-width: 200px; max-width: calc(100% - 72px); background: var(--black); border-radius: 12px; overflow: hidden; }
+.poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vbot { padding: 2px 16px 0; display: grid; gap: 4px; align-content: start; justify-items: start; }
+.chipc { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 9px; border-radius: 99px; background: var(--c, var(--hl-yellow)); color: var(--pen); }
+.note { margin: 0; font-size: .95rem; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.vt { margin: 0; font: 600 .85rem/1.25 var(--body); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; opacity: .9; }
+.by { margin: 0; font-size: .75rem; color: var(--mute); }
+.badge { margin: 0; font-size: .8rem; font-weight: 700; color: var(--hl-yellow); }
+.vbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; width: 100%; }
+.vb { display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--ink-3); background: none; color: var(--text); border-radius: 99px; padding: 8px 14px; font-weight: 700; font-size: .85rem; text-decoration: none; }
+.vb.next { margin-left: auto; background: var(--hl-yellow); border-color: var(--hl-yellow); color: var(--pen); font: 800 .95rem/1 var(--display); padding: 11px 18px; }
+.vb .off, .feed.muted .vb .on { display: none; }
+.feed.muted .vb .off { display: block; }
+/* The one video player. It sits in the scrolling feed, exactly over the current slide's video box. */
+.screen { position: absolute; z-index: 1; left: 0; top: 0; width: 0; height: 0; background: var(--black); border-radius: 12px; overflow: hidden; visibility: hidden; }
+.screen.live { visibility: visible; }
+.screen iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+#ttp { z-index: 1; background: var(--black); }
+.legal { color: var(--mute); font-size: .75rem; line-height: 1.4; margin: 0; }
+.legal a { color: var(--text); }
+.home .legal { color: var(--pen); opacity: .75; }
+.home .legal a { color: var(--pen); }
+.nav { position: absolute; z-index: 6; right: 16px; top: 50%; transform: translateY(-50%); display: grid; gap: 10px; }
+.nav button { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--ink); color: var(--text); }
+.nav.low { top: auto; bottom: 16px; transform: none; }
+@media (hover: none) { .nav { display: none; } }
+
+/* paper slides: home, quiz, notes, end */
+.card { color: var(--pen); background-color: var(--c, var(--paper)); background-image: repeating-linear-gradient(transparent 0 33px, var(--rule) 33px 34px); }
+.card::before { content: ""; position: absolute; top: 0; bottom: 0; left: 18px; width: 2px; background: var(--margin); }
+[data-c="yellow"] { --c: var(--hl-yellow); }
+[data-c="mint"] { --c: var(--hl-mint); }
+[data-c="pink"] { --c: var(--hl-pink); }
+[data-c="blue"] { --c: var(--hl-blue); }
+[data-c="orange"] { --c: var(--hl-orange); }
+[data-c="lilac"] { --c: var(--hl-lilac); }
+.body { position: relative; height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 60px 70px 34px 36px; }
+.body::before, .body::after { content: ""; flex: 1; }
+.kind { margin: 0; font-size: .74rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+.head { margin: 0; font: 800 clamp(1.5rem, 3.4vh + .5rem, 2.3rem)/1.06 var(--display); letter-spacing: -.02em; text-wrap: balance; }
+.head.q { font-size: clamp(1.25rem, 2.4vh + .5rem, 1.7rem); line-height: 1.14; }
+.card p { margin: 0; }
+.opts { display: flex; flex-direction: column; gap: 9px; }
+.opt { display: flex; gap: 12px; align-items: center; text-align: left; padding: 11px 13px; border: 2px solid var(--pen); border-radius: 14px; background: var(--wash); color: var(--pen); font-weight: 600; line-height: 1.25; }
+.opt .key { font: 800 1rem/1 var(--display); min-width: 1em; }
+.opt:disabled { cursor: default; opacity: .55; }
+.opt.right, .opt.wrong { opacity: 1; color: var(--paper); border-color: transparent; }
+.opt.right { background: var(--good); }
+.opt.wrong { background: var(--bad); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.pair .opt { justify-content: center; font: 800 1.2rem/1 var(--display); padding-block: 15px; }
+.why { font-weight: 600; background: var(--pen); color: var(--paper); padding: 12px 14px; border-radius: 14px; }
+.swipe { font-size: .85rem; font-weight: 700; opacity: .7; }
+.go { border: 0; border-radius: 16px; background: var(--pen); color: var(--paper); font: 800 1.15rem/1 var(--display); padding: 15px; }
+.ghost { border: 2px solid var(--pen); background: none; color: var(--pen); border-radius: 16px; padding: 12px 16px; font-weight: 700; }
+
+.home h1 { margin: 0; font: 800 clamp(2rem, 4.6vh + .6rem, 2.9rem)/1 var(--display); letter-spacing: -.025em; text-wrap: balance; }
+.home h1 mark { background: var(--hl-yellow); color: var(--pen); padding: 0 .12em; border-radius: 6px; }
+.home .body { padding-right: 28px; }
+.m-brand { display: none; font: 800 1.1rem/1 var(--display); }
+.decks { display: grid; gap: 10px; }
+.deck { display: grid; gap: 3px; text-align: left; border: 2px solid var(--pen); border-radius: 18px; background: var(--paper); color: var(--pen); padding: 14px 16px; box-shadow: 5px 5px 0 var(--pen); }
+.deck b { font: 800 1.25rem/1.15 var(--display); }
+.deck span { font-size: .9rem; font-weight: 600; opacity: .75; }
+.hint { font-size: .92rem; opacity: .8; }
+.pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.seg { display: flex; border: 2px solid var(--pen); border-radius: 99px; overflow: hidden; }
+.seg button { border: 0; background: none; color: var(--pen); font-weight: 700; padding: 7px 16px; }
+.seg button[aria-pressed="true"] { background: var(--pen); color: var(--paper); }
+.inapp { text-align: center; border: 2px solid var(--pen); border-radius: 16px; padding: 12px 16px; font-weight: 700; color: var(--pen); text-decoration: none; }
+.deckrow { display: grid; gap: 8px; }
+
+.toast { position: absolute; z-index: 8; left: 50%; top: 52px; transform: translateX(-50%); background: var(--ink); color: var(--text); padding: 9px 14px; border-radius: 99px; font-size: .85rem; font-weight: 600; max-width: calc(100% - 32px); text-align: center; }
+
+@media (max-width: 820px) {
+  .app { grid-template-columns: minmax(0, 1fr); padding: 0; gap: 0; }
+  .stage { aspect-ratio: auto; width: 100%; border-radius: 0; }
+  .pill.icon { display: block; }
+  .m-brand { display: block; }
+  .side { display: none; position: absolute; inset: 0; z-index: 20; background: var(--ink); padding: 24px 20px; }
+  .app.sheet .side { display: flex; }
+  .close { display: block; align-self: flex-end; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter i { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="side" aria-label="Your deck">
+    <button class="tog close" id="closeSide" type="button">Back to feed</button>
+    <div>
+      <p class="brand">Doom<span>study</span></p>
+      <p class="tag">Your study guide, as a feed you can't put down.</p>
+    </div>
+    <div>
+      <p class="label">Now scrolling</p>
+      <h2 id="deckTitle">Pick a deck</h2>
+    </div>
+    <dl class="stats">
+      <div><dt>Watched</dt><dd id="stSeen">0</dd></div>
+      <div><dt>Quiz</dt><dd id="stQuiz">0/0</dd></div>
+      <div><dt>Best run</dt><dd id="stBest">0</dd></div>
+    </dl>
+    <button class="cta" id="testBtn" type="button" hidden>Test mode · difficulty 8/10</button>
+    <a class="cta alt" id="ytAll" target="_blank" rel="noopener" hidden>Full compilation on YouTube</a>
+    <div id="timeline"></div>
+    <div>
+      <p class="label">What you know</p>
+      <ul class="concepts" id="concepts"></ul>
+    </div>
+    <div class="toggles">
+      <button class="tog" id="togSound" type="button">Sound: on</button>
+      <button class="tog" id="allDecks" type="button">All decks</button>
+    </div>
+    <p class="keys">Tap Next, swipe beside the video, or use the arrow keys: one move, one slide. Space pauses. M mutes.</p>
+  </aside>
+
+  <main class="stage">
+    <div class="hud">
+      <button class="pill icon" id="openSide" type="button" aria-label="Open deck and settings"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div class="bar" role="progressbar" aria-label="30 minute session" aria-valuemin="0" aria-valuemax="30" id="bar"><i></i></div>
+      <span class="pill" id="time">30:00</span>
+      <span class="pill" id="pos" hidden></span>
+    </div>
+
+    <div class="feed" id="feed">
+      <div class="screen" id="screen"><div id="ytp"></div><iframe id="ttp" title="TikTok video" allow="autoplay; encrypted-media" hidden></iframe></div>
+      <section class="slide card home" id="home">
+        <div class="body">
+          <p class="m-brand">Doomstudy</p>
+          <h1>Scroll your <mark>study guide.</mark></h1>
+          <p>Real short videos about exactly what's on your study guide. One swipe, one video. Thirty minutes of scrolling and you know it.</p>
+          <div class="pick" id="pickRow">
+            <span class="kind">Your app</span>
+            <div class="seg" id="apps" role="group" aria-label="Which app your videos come from">
+              <button type="button" data-app="yt" aria-pressed="true">YouTube</button>
+              <button type="button" data-app="tt" aria-pressed="false">TikTok</button>
+            </div>
+          </div>
+          <div class="decks" id="decks"></div>
+          <p class="hint" id="homeHint">Want your own? Send Claude a photo of your study guide and a new deck shows up here.</p>
+          <p class="legal">Videos play through YouTube. By watching them here you agree to the <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener">YouTube Terms of Service</a>. See the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>. This site saves your place and scores only in your own browser.</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="nav" id="nav" hidden>
+      <button id="navUp" type="button" aria-label="Previous video"><svg class="ic" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+      <button id="navDown" type="button" aria-label="Next video"><svg class="ic" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </main>
+</div>
+<script src="player.js"></script>
+<script src="timeline.js"></script>
+<script src="test.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

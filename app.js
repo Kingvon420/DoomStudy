@@ -3,6 +3,7 @@
   const $ = id => document.getElementById(id);
   const feed = $('feed');
   const GOAL = 1800;
+  const Cards = typeof Motion !== 'undefined' ? Motion : null;
   const HL = ['yellow', 'mint', 'pink', 'blue', 'orange', 'lilac'];
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ICON = {
@@ -210,13 +211,14 @@
     if (!tl) $('timeline').textContent = '';
     $('testBtn').hidden = !(deck.test && deck.test.length);
     units.forEach((u, i) => {
-      // Each term is a read, then a watch, then a check when there is one.
-      if (mo[u.term]) {
+      // Each term is a watch, then a check when there is one. The animated reading cards are
+      // optional: they only appear when motion.js is loaded by the page.
+      if (Cards && mo[u.term]) {
         const before = tag(units[i - 1]), next = tag(units[i + 1]);
         const chain = [before && 'Before: ' + before, next && 'Next: ' + next].filter(Boolean).join('. ');
         // The person-to-event link for this term (two at most, so the notes card stays short).
         const connect = (deck.links || []).filter(l => l.term === u.term).slice(0, 2).map(l => l.p + ' → ' + l.e).join('. ');
-        const r = Motion.build(Object.assign({ term: u.term, note: notes[u.term] || '', chain: chain && chain + '.', connect }, mo[u.term]));
+        const r = Cards.build(Object.assign({ term: u.term, note: notes[u.term] || '', chain: chain && chain + '.', connect }, mo[u.term]));
         r._it = { t: 'read', c: u.c, term: u.term };
         feed.append(r);
       }
@@ -306,7 +308,7 @@
     const list = slides(), s = list[i], it = s._it;
     Player.focus(s, i);
     const reading = s.classList.contains('mo');
-    if (reading) Motion.play(s); else Motion.stop();
+    if (Cards) { if (reading) Cards.play(s); else Cards.stop(); }
     if (tl && it && it.term) tl.setCurrent(it.term);
     $('nav').classList.toggle('low', reading);
     clearTimeout(watchT);
@@ -374,7 +376,7 @@
   }, { passive: false });
 
   // Tapping past a reading card's last scene moves on to its video.
-  Motion.hooks.past = () => go(cur + 1);
+  if (Cards) Cards.hooks.past = () => go(cur + 1);
 
   // The timeline and the test's "Study this" buttons land on a term's reading card.
   function jump(term) {
@@ -389,7 +391,7 @@
     if (!deck || Test.open) return;
     $('app').classList.remove('sheet');
     Player.drop(Player.active);
-    Motion.stop();
+    if (Cards) Cards.stop();
     Test.start(document.querySelector('.stage'), deck, { exit: () => activate(cur, true), study: jump });
   }
   $('testBtn').onclick = startTest;
@@ -403,8 +405,8 @@
     if (k === 'arrowdown' || k === 'j' || k === 'pagedown') { e.preventDefault(); go(cur + 1); }
     else if (k === 'arrowup' || k === 'k' || k === 'pageup') { e.preventDefault(); go(cur - 1); }
     else if (k === ' ' && e.target.tagName !== 'BUTTON' && s.classList.contains('vid')) { e.preventDefault(); Player.tap(s); }
-    else if (k === ' ' && s.classList.contains('mo')) { e.preventDefault(); Motion.toggle(); }
-    else if ((k === 'arrowright' || k === 'arrowleft') && s.classList.contains('mo')) { e.preventDefault(); Motion.step(k === 'arrowright' ? 1 : -1); }
+    else if (k === ' ' && s.classList.contains('mo')) { e.preventDefault(); Cards.toggle(); }
+    else if ((k === 'arrowright' || k === 'arrowleft') && s.classList.contains('mo')) { e.preventDefault(); Cards.step(k === 'arrowright' ? 1 : -1); }
     else if (k === 'm') setSound(Player.silent);
     else if ('abcd'.includes(k) && k.length === 1 && s.classList.contains('quiz')) {
       const b = s.querySelectorAll('.opt')['abcd'.indexOf(k)];

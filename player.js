@@ -21,7 +21,12 @@ const Player = (() => {
       events: {
         onReady: () => { ready = true; if (active && !isTT(active)) start(active); },
         onStateChange: e => { if (!isTT(active)) onState(e.data); },
-        onError: () => { if (active && !isTT(active)) hooks.dead(active); }
+        // 100, 101 and 150 mean the video is gone or may not be embedded: drop it for good.
+        // Anything else can be a passing glitch, so just move on and try it again next time.
+        onError: e => {
+          if (!active || isTT(active)) return;
+          if ([100, 101, 150].includes(e.data)) hooks.dead(active); else hooks.skip(active);
+        }
       }
     });
   };
