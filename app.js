@@ -466,10 +466,16 @@
   if (!local) { source = 'yt'; $('pickRow').hidden = true; $('homeHint').textContent = 'New decks are added by request.'; }
 
   // ---- decks ----
+  // Deck files normally live in the feeds folder. If they were uploaded next to the app instead,
+  // they are found there too.
+  async function feedFile(name) {
+    const r = await fetch('feeds/' + name, { cache: 'no-store' });
+    return r.ok ? r : fetch(name, { cache: 'no-store' });
+  }
   async function openDeck(f) {
     try {
       if (file !== f || !deck) {
-        const r = await fetch('feeds/' + encodeURIComponent(f), { cache: 'no-store' });
+        const r = await feedFile(encodeURIComponent(f));
         if (!r.ok) throw 0;
         const d = await r.json();
         deck = d; file = f; S = loadState(f);
@@ -484,7 +490,7 @@
 
   async function boot() {
     try {
-      const r = await fetch('feeds/index.json', { cache: 'no-store' });
+      const r = await feedFile('index.json');
       decks = r.ok ? await r.json() : [];
     } catch (e) { decks = []; }
     if (!Array.isArray(decks)) decks = [];
