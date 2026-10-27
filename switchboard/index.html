@@ -1,0 +1,819 @@
+<title>Switchboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap">
+<style>
+/* Layout: full-bleed game canvas, thin HUD strip on top, hint on the bottom. Single dark arcade look by choice. */
+:root {
+  --bg: #0b0e1a;
+  --panel: #141a30;
+  --line: #26305a;
+  --ink: #e8ecff;
+  --muted: #9aa4c7;
+  --hub: #45d4ff;
+  --font-display: "Bungee", Impact, sans-serif;
+  --font-body: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.hud {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5; pointer-events: none;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.brand { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.logo { font-family: var(--font-display); font-size: 15px; letter-spacing: .04em; color: var(--hub); }
+#world { font-weight: 700; font-size: 12px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+.right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.coins { font-weight: 600; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.coins b { font-family: var(--font-display); font-weight: 400; color: #ffd23f; font-size: 16px; }
+#status {
+  font-weight: 700; font-size: 13px; letter-spacing: .06em; font-variant-numeric: tabular-nums;
+  background: rgba(11,14,26,.72); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px;
+}
+#status:empty { display: none; }
+#leave {
+  pointer-events: auto; font: 700 12px var(--font-body); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+#leave:focus-visible, #closePanel:focus-visible { outline: 2px solid var(--hub); outline-offset: 2px; }
+#hint {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; pointer-events: none; text-align: center;
+  font-size: 12px; font-weight: 600; letter-spacing: .05em; color: var(--muted);
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+#toast {
+  position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 6;
+  max-width: calc(100% - 32px); width: max-content; text-align: center; text-wrap: balance;
+  background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--toast, var(--hub));
+  border-radius: 6px; padding: 8px 14px; font-weight: 700; font-size: 13px; letter-spacing: .04em;
+}
+#panel {
+  position: fixed; inset: 0; z-index: 10; background: rgba(6,8,16,.86); overflow-y: auto;
+  padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.card { max-width: 620px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.card h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 22px; color: var(--hub); text-wrap: balance; }
+.card p { margin: 0; line-height: 1.55; color: var(--ink); font-size: 15px; }
+.card .dim { color: var(--muted); font-size: 13px; }
+.card pre { margin: 0; overflow-x: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 12px; font: 500 12.5px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #cfe6ff; user-select: text; -webkit-user-select: text; }
+.stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.stack div { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+.stack b { display: block; font-size: 11px; letter-spacing: .12em; color: var(--muted); }
+#closePanel { align-self: flex-start; font: 700 13px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--bg); background: var(--hub); border: 0; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
+</style>
+
+<canvas id="game" aria-label="Switchboard game world"></canvas>
+<header class="hud">
+  <div class="brand"><span class="logo">SWITCHBOARD</span><span id="world">The Plaza</span></div>
+  <div class="right">
+    <span class="coins"><b id="coins">0</b> coins</span>
+    <span id="status"></span>
+    <button id="leave" type="button" hidden>Leave game</button>
+  </div>
+</header>
+<div id="hint"></div>
+<div id="toast" hidden></div>
+
+<section id="panel" hidden>
+  <div class="card">
+    <h2>Plug in any game</h2>
+    <p>Every game in Switchboard is a cartridge that plugs into one kernel. The kernel owns the things that should never change between games: your crew, your wallet, your controls, and the world map. A game only has to describe its own rules.</p>
+    <div class="stack">
+      <div><b>KERNEL</b>party, wallet, input, camera, portals</div>
+      <div><b>CARTRIDGE</b>rules, field, scoring, AI</div>
+      <div><b>CONTRACT</b>enter → update → draw → finish</div>
+    </div>
+    <p>Register one more cartridge and a new portal appears in the plaza on the next load. That is the whole trick behind "every game in one world":</p>
+<pre>OS.register({
+  id: 'kart', title: 'KART', tagline: 'Racing · 90s',
+  color: '#ffd23f', zoom: 600, world: { w: 2000, h: 1200 },
+  hint: 'A = boost',
+  drawIcon(g, x, y, s) { /* the portal's logo */ },
+
+  enter(ctx) {
+    // ctx.party is the same crew from the plaza
+    this.ctx = ctx;
+  },
+  update(dt) {
+    // read input.x, input.y, input.act
+    // when the race ends:
+    // this.ctx.finish({ score, coins, summary });
+  },
+  draw(g)  { /* draw the track */ },
+  focus()  { return this.you; },   // camera target
+  status() { return 'LAP 2/3'; }
+});</pre>
+    <p class="dim">In this file, find <b>OS.register</b> to see how HOOPS, GRIDIRON and WARZONE are built. Each is about 150 lines.</p>
+    <button id="closePanel" type="button">Back to the plaza</button>
+  </div>
+</section>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- small helpers ---------- */
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const rand = (a, b) => a + Math.random() * (b - a);
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const lerp = (a, b, t) => a + (b - a) * t;
+const fmt = s => { s = Math.ceil(s); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const FONT_D = '"Bungee", Impact, sans-serif';
+const FONT_B = '"Chakra Petch", "Segoe UI", system-ui, sans-serif';
+
+/* ---------- profile: one wallet across every game ---------- */
+const SAVE_KEY = 'switchboard.profile.v1';
+const profile = (() => {
+  const base = { coins: 0, best: {}, plays: 0 };
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (s && typeof s === 'object') return { ...base, ...s, best: { ...(s.best || {}) } };
+  } catch (e) {}
+  return base;
+})();
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(profile)); } catch (e) {} }
+
+/* ---------- the party: same four people in every game ---------- */
+const PARTY = [
+  { id: 'you', name: 'YOU', color: '#45d4ff' },
+  { id: 'dre', name: 'DRE', color: '#ffd23f' },
+  { id: 'mia', name: 'MIA', color: '#c77dff' },
+  { id: 'kai', name: 'KAI', color: '#7cf29a' },
+];
+
+/* ---------- characters ---------- */
+function mk(x, y, p) { return { x, y, r: 14, face: -Math.PI / 2, color: p.color, name: p.name, moving: false, t: Math.random() * 10 }; }
+function steer(c, dx, dy, speed, dt) {
+  const m = Math.hypot(dx, dy);
+  if (m > 1) { dx /= m; dy /= m; }
+  c.x += dx * speed * dt; c.y += dy * speed * dt;
+  c.moving = m > 0.1;
+  if (c.moving) c.face = Math.atan2(dy, dx);
+}
+function seek(c, tx, ty, speed, dt, stop = 4) {
+  const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy);
+  if (d <= stop) { c.moving = false; return d; }
+  const step = Math.min(speed * dt, d - stop);
+  c.x += dx / d * step; c.y += dy / d * step;
+  c.face = Math.atan2(dy, dx); c.moving = true;
+  return d;
+}
+function drawChar(g, c, label = true) {
+  c.t += 0.016;
+  const bob = c.moving ? Math.sin(c.t * 18) * 1.5 : 0;
+  g.fillStyle = 'rgba(0,0,0,.35)';
+  g.beginPath(); g.ellipse(c.x, c.y + c.r * 0.75, c.r * 0.9, c.r * 0.4, 0, 0, TAU); g.fill();
+  g.fillStyle = c.color;
+  g.beginPath(); g.arc(c.x, c.y + bob, c.r, 0, TAU); g.fill();
+  g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.45)'; g.stroke();
+  g.fillStyle = '#0b0e1a';
+  g.beginPath(); g.arc(c.x + Math.cos(c.face) * c.r * 0.5, c.y + bob + Math.sin(c.face) * c.r * 0.5, c.r * 0.34, 0, TAU); g.fill();
+  if (label && c.name) {
+    g.font = `700 11px ${FONT_B}`; g.textAlign = 'center';
+    g.fillStyle = 'rgba(0,0,0,.55)'; g.fillText(c.name, c.x + 1, c.y - c.r - 7);
+    g.fillStyle = c.color; g.fillText(c.name, c.x, c.y - c.r - 8);
+  }
+}
+function pushOutRect(c, r) {
+  const nx = clamp(c.x, r.x, r.x + r.w), ny = clamp(c.y, r.y, r.y + r.h);
+  const dx = c.x - nx, dy = c.y - ny, d = Math.hypot(dx, dy);
+  if (d >= c.r) return;
+  if (d === 0) { c.y = r.y - c.r; return; }
+  c.x += dx / d * (c.r - d); c.y += dy / d * (c.r - d);
+}
+
+/* ---------- effects ---------- */
+const FX = {
+  parts: [], texts: [],
+  clear() { this.parts = []; this.texts = []; },
+  burst(x, y, color, n = 12, sp = 160) {
+    for (let i = 0; i < n; i++) { const a = rand(0, TAU), s = rand(sp * .3, sp); this.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(.3, .7), color }); }
+  },
+  text(x, y, str, color = '#fff', size = 18) { this.texts.push({ x, y, str, color, size, life: 1.2 }); },
+  update(dt) {
+    for (const p of this.parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .92; p.vy *= .92; p.life -= dt; }
+    this.parts = this.parts.filter(p => p.life > 0);
+    for (const t of this.texts) { t.y -= 34 * dt; t.life -= dt; }
+    this.texts = this.texts.filter(t => t.life > 0);
+  },
+  draw(g) {
+    for (const p of this.parts) { g.globalAlpha = clamp(p.life / .4, 0, 1); g.fillStyle = p.color; g.fillRect(p.x - 2, p.y - 2, 4, 4); }
+    g.textAlign = 'center';
+    for (const t of this.texts) {
+      g.globalAlpha = clamp(t.life / .4, 0, 1);
+      g.font = `${t.size}px ${FONT_D}`;
+      g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.65)'; g.strokeText(t.str, t.x, t.y);
+      g.fillStyle = t.color; g.fillText(t.str, t.x, t.y);
+    }
+    g.globalAlpha = 1;
+  },
+};
+
+/* ---------- input: keyboard + touch joystick, one shape for every game ---------- */
+const canvas = document.getElementById('game');
+const g = canvas.getContext('2d');
+const keys = {};
+const input = { x: 0, y: 0, act: false, pressed: false, released: false };
+const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
+const btn = { id: null };
+let touchUI = matchMedia('(pointer: coarse)').matches;
+let prevAct = false;
+const panel = document.getElementById('panel');
+
+addEventListener('keydown', e => {
+  if (!panel.hidden) return;
+  keys[e.code] = true;
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; joy.id = btn.id = null; });
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (e.pointerType === 'touch') touchUI = true;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  if (x < rect.width * 0.5 && joy.id === null) { joy.id = e.pointerId; joy.ox = joy.x = x; joy.oy = joy.y = y; }
+  else if (btn.id === null) btn.id = e.pointerId;
+});
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerId !== joy.id) return;
+  const rect = canvas.getBoundingClientRect();
+  joy.x = e.clientX - rect.left; joy.y = e.clientY - rect.top;
+});
+const release = e => { if (e.pointerId === joy.id) joy.id = null; if (e.pointerId === btn.id) btn.id = null; };
+canvas.addEventListener('pointerup', release);
+canvas.addEventListener('pointercancel', release);
+
+function readInput() {
+  let x = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+  let y = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+  if (joy.id !== null) {
+    x = (joy.x - joy.ox) / 55; y = (joy.y - joy.oy) / 55;
+    const m = Math.hypot(x, y);
+    if (m < 0.15) x = y = 0; else if (m > 1) { x /= m; y /= m; }
+  } else { const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; } }
+  input.x = x; input.y = y;
+  const act = !!(keys.Space || keys.KeyJ || keys.Enter || btn.id !== null) && panel.hidden;
+  input.pressed = act && !prevAct; input.released = !act && prevAct; input.act = act;
+  prevAct = act;
+}
+
+/* ---------- UI bits ---------- */
+const $ = id => document.getElementById(id);
+const ui = {
+  status: '',
+  sync() {
+    const s = OS.scene;
+    $('world').textContent = s === Hub ? 'The Plaza' : s.title;
+    $('leave').hidden = s === Hub;
+    $('hint').textContent = s.hint || '';
+    $('coins').textContent = profile.coins.toLocaleString();
+  },
+  frame() {
+    const s = OS.scene.status ? OS.scene.status() : '';
+    if (s !== this.status) { this.status = s; $('status').textContent = s; }
+  },
+};
+let toastTimer = 0;
+function toast(msg, color) {
+  const t = $('toast');
+  t.textContent = msg; t.style.setProperty('--toast', color || '#45d4ff'); t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 4200);
+}
+
+/* ======================================================================
+   THE KERNEL
+   Owns what every game shares: the party, the wallet, the scene switch.
+   Games ("cartridges") only describe their own rules.
+   ====================================================================== */
+const OS = {
+  carts: [],
+  scene: null,
+  register(cart) { this.carts.push(cart); return cart; },
+  go(scene, arg) { FX.clear(); this.scene = scene; scene.enter(arg); ui.sync(); },
+  launch(cart) {
+    profile.plays++;
+    const ctx = { party: PARTY, profile, finish: res => this.finish(cart, res) };
+    this.go(cart, ctx);
+    toast(`${cart.title} · party of ${PARTY.length} loaded in`, cart.color);
+  },
+  finish(cart, res) {
+    const coins = Math.max(0, Math.round(res.coins || 0));
+    profile.coins += coins;
+    const newBest = res.score > (profile.best[cart.id] || 0);
+    if (newBest) profile.best[cart.id] = res.score;
+    save();
+    this.go(Hub, { from: cart });
+    toast(`${cart.title}: ${res.summary} · +${coins} coins${newBest ? ' · new best' : ''}`, cart.color);
+  },
+};
+
+/* ======================================================================
+   CARTRIDGE 1: HOOPS (the 2K slot)
+   ====================================================================== */
+OS.register({
+  id: 'hoops', title: 'HOOPS', tagline: '2K-style shootout · 45s', color: '#ff8a3d',
+  zoom: 740, world: { w: 900, h: 720 }, actionLabel: 'SHOOT',
+  hint: 'Hold A to load the shot, release in the green. Behind the arc is worth 3.',
+  drawIcon(g, x, y, s) {
+    g.fillStyle = '#ff8a3d'; g.beginPath(); g.arc(x, y, s, 0, TAU); g.fill();
+    g.strokeStyle = '#3a1a08'; g.lineWidth = 2.5; g.beginPath();
+    g.moveTo(x - s, y); g.lineTo(x + s, y); g.moveTo(x, y - s); g.lineTo(x, y + s);
+    g.moveTo(x - s * .7, y - s * .7); g.quadraticCurveTo(x - s * .1, y, x - s * .7, y + s * .7);
+    g.moveTo(x + s * .7, y - s * .7); g.quadraticCurveTo(x + s * .1, y, x + s * .7, y + s * .7); g.stroke();
+  },
+  enter(ctx) {
+    this.ctx = ctx; this.done = false; this.t = 45; this.score = 0; this.hoop = { x: 450, y: 96 };
+    this.you = mk(450, 470, ctx.party[0]);
+    this.mates = ctx.party.slice(1).map((p, i) => { const m = mk(220 + i * 230, 380, p); m.cd = rand(2.5, 5); m.tx = m.x; m.ty = m.y; m.re = 0; return m; });
+    this.def = mk(450, 330, { name: 'DEF', color: '#6b7390' });
+    this.balls = []; this.charging = false; this.phase = 0; this.meter = 0; this.holding = true;
+  },
+  focus() { return this.you; },
+  status() { return `${this.score} PTS · ${fmt(this.t)}`; },
+  launchBall(from, made, pts, color, mine) {
+    const h = this.hoop, d = dist(from, h);
+    const ex = made ? h.x : h.x + rand(14, 26) * (Math.random() < .5 ? -1 : 1), ey = made ? h.y : h.y + rand(-4, 12);
+    this.balls.push({ sx: from.x, sy: from.y, ex, ey, k: 0, dur: 0.5 + d / 900, h: 40 + d * 0.25, made, pts, color, mine, by: from, done: false });
+  },
+  shoot(y) {
+    const h = this.hoop, dd = dist(y, h), err = Math.abs(this.meter - 0.85);
+    const contested = dist(this.def, y) < 55;
+    let p = clamp(1 - err / 0.4, 0, 1) * 0.95 - clamp((dd - 140) / 700, 0, 0.45) - (contested ? 0.22 : 0);
+    const perfect = err < 0.05;
+    if (perfect) p += 0.25;
+    p = clamp(p, 0.03, 0.97);
+    this.holding = false;
+    FX.text(y.x, y.y - 44, perfect ? 'PERFECT' : err < 0.15 ? 'GOOD' : err < 0.3 ? 'OK' : 'OFF', perfect ? '#7cf29a' : '#e8ecff', 13);
+    if (contested) FX.text(y.x, y.y - 62, 'CONTESTED', '#ff8a3d', 11);
+    this.launchBall(y, Math.random() < p, dd > 300 ? 3 : 2, y.color, true);
+  },
+  update(dt) {
+    if (this.done) return;
+    this.t = Math.max(0, this.t - dt);
+    const y = this.you, h = this.hoop;
+    steer(y, input.x, input.y, this.charging ? 90 : 220, dt);
+    y.x = clamp(y.x, 40, 860); y.y = clamp(y.y, 140, 690);
+    if (this.holding && this.t > 0) {
+      if (input.act) { this.charging = true; this.phase += dt * 1.5; const m = this.phase % 2; this.meter = m < 1 ? m : 2 - m; }
+      if (input.released && this.charging) { this.shoot(y); this.charging = false; this.phase = 0; }
+    } else this.charging = false;
+    const a = Math.atan2(h.y - y.y, h.x - y.x);
+    seek(this.def, y.x + Math.cos(a) * 46, y.y + Math.sin(a) * 46, 165, dt, 2);
+    this.def.face = Math.atan2(y.y - this.def.y, y.x - this.def.x);
+    for (const m of this.mates) {
+      m.re -= dt;
+      if (m.re <= 0) { const ang = rand(0.15, Math.PI - 0.15), r = rand(150, 330); m.tx = h.x + Math.cos(ang) * r; m.ty = h.y + Math.sin(ang) * r; m.re = rand(1.5, 3); }
+      seek(m, m.tx, m.ty, 170, dt, 6);
+      m.cd -= dt;
+      if (m.cd <= 0 && this.t > 0) { m.cd = rand(3.5, 6.5); const dd = dist(m, h); m.face = Math.atan2(h.y - m.y, h.x - m.x); this.launchBall(m, Math.random() < clamp(0.62 - dd / 900, 0.2, 0.6), dd > 300 ? 3 : 2, m.color, false); }
+    }
+    for (const b of this.balls) {
+      b.k += dt / b.dur;
+      if (b.k >= 1 && !b.done) {
+        b.done = true;
+        if (b.made) { this.score += b.pts; FX.burst(h.x, h.y, '#ff8a3d', 18); FX.text(h.x, h.y + 46, `+${b.pts} ${b.by.name}`, b.color, 16); }
+        else FX.text(b.ex, b.ey + 30, 'BRICK', '#9aa4c7', 12);
+        if (b.mine) this.holding = true;
+      }
+    }
+    this.balls = this.balls.filter(b => !b.done || (!b.made && b.k < 1.5));
+    if (this.t <= 0 && this.balls.every(b => b.done)) {
+      this.done = true;
+      this.ctx.finish({ score: this.score, coins: this.score, summary: `${this.score} team points` });
+    }
+  },
+  draw(g) {
+    const h = this.hoop;
+    g.fillStyle = '#2a1a12'; g.fillRect(0, 0, 900, 720);
+    g.fillStyle = '#34200f';
+    for (let x = 40; x < 860; x += 40) g.fillRect(x, 40, 20, 650);
+    g.strokeStyle = 'rgba(255,214,170,.55)'; g.lineWidth = 3;
+    g.strokeRect(40, 40, 820, 650);
+    g.fillStyle = 'rgba(255,138,61,.16)'; g.fillRect(370, 40, 160, 210); g.strokeRect(370, 40, 160, 210);
+    g.beginPath(); g.arc(450, 250, 60, 0, TAU); g.stroke();
+    g.beginPath(); g.moveTo(150, 40); g.lineTo(150, 96); g.arc(h.x, h.y, 300, Math.PI, 0, true); g.lineTo(750, 40); g.stroke();
+    g.beginPath(); g.arc(450, 690, 80, Math.PI, TAU); g.stroke();
+    g.font = `22px ${FONT_D}`; g.textAlign = 'center'; g.fillStyle = 'rgba(255,214,170,.12)'; g.fillText('SWITCHBOARD', 450, 560);
+    g.fillStyle = '#e8ecff'; g.fillRect(410, 66, 80, 6);
+    g.strokeStyle = '#ff8a3d'; g.lineWidth = 4; g.beginPath(); g.arc(h.x, h.y, 16, 0, TAU); g.stroke();
+    const crew = [this.def, ...this.mates, this.you].sort((a, b) => a.y - b.y);
+    for (const c of crew) drawChar(g, c);
+    const y = this.you;
+    if (this.holding) { g.fillStyle = '#ff8a3d'; g.beginPath(); g.arc(y.x + Math.cos(y.face + .9) * 16, y.y + Math.sin(y.face + .9) * 16, 6, 0, TAU); g.fill(); }
+    for (const b of this.balls) {
+      let x, yy, z;
+      if (b.k <= 1) { x = lerp(b.sx, b.ex, b.k); yy = lerp(b.sy, b.ey, b.k); z = Math.sin(b.k * Math.PI) * b.h; }
+      else { const k = b.k - 1; x = b.ex + (b.ex - h.x) * k * 4; yy = b.ey + k * 120; z = Math.abs(Math.sin(k * 9)) * 18 * (1 - k * 1.6); }
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(x, yy, 6, 3, 0, 0, TAU); g.fill();
+      g.fillStyle = '#ff8a3d'; g.beginPath(); g.arc(x, yy - z, 7, 0, TAU); g.fill();
+      g.strokeStyle = '#3a1a08'; g.lineWidth = 1.5; g.stroke();
+    }
+    if (this.charging) {
+      const bx = y.x - 32, by = y.y - 40;
+      g.fillStyle = 'rgba(0,0,0,.7)'; g.fillRect(bx - 2, by - 2, 68, 12);
+      g.fillStyle = '#7cf29a'; g.fillRect(bx + 64 * 0.8, by, 64 * 0.1, 8);
+      g.fillStyle = '#e8ecff'; g.fillRect(bx, by, 64 * this.meter, 8);
+    }
+  },
+});
+
+/* ======================================================================
+   CARTRIDGE 2: GRIDIRON (the Madden slot)
+   ====================================================================== */
+const YD = 11.8; // pixels per yard on this field
+OS.register({
+  id: 'gridiron', title: 'GRIDIRON', tagline: 'Madden-style drive · 60s', color: '#52d273',
+  zoom: 600, world: { w: 1500, h: 640 }, actionLabel: 'SPIN',
+  hint: 'Run it into the end zone. Your crew blocks. A = spin move (breaks one tackle).',
+  drawIcon(g, x, y, s) {
+    g.fillStyle = '#8a4a22'; g.beginPath(); g.ellipse(x, y, s * 1.15, s * .7, -0.5, 0, TAU); g.fill();
+    g.strokeStyle = '#f2e8dc'; g.lineWidth = 2.5; g.save(); g.translate(x, y); g.rotate(-0.5);
+    g.beginPath(); g.moveTo(-s * .45, 0); g.lineTo(s * .45, 0);
+    for (let i = -2; i <= 2; i++) { g.moveTo(i * s * .18, -s * .16); g.lineTo(i * s * .18, s * .16); }
+    g.stroke(); g.restore();
+  },
+  enter(ctx) { this.ctx = ctx; this.done = false; this.t = 60; this.score = 0; this.yards = 0; this.los = 140; this.down = 1; this.setup(); },
+  setup() {
+    const L = this.los;
+    this.phase = 'play'; this.dead = 0; this.spin = 0; this.spinCd = 0;
+    this.you = mk(L, 320, this.ctx.party[0]); this.you.face = 0;
+    this.blockers = this.ctx.party.slice(1).map((p, i) => { const b = mk(L + 50, 200 + i * 120, p); b.face = 0; b.lock = null; return b; });
+    this.defs = ['DE', 'LB', 'LB', 'CB', 'CB', 'S', 'S'].map(n => {
+      const x = clamp(L + rand(160, 620) + (n === 'S' ? 220 : 0), L + 130, 1440);
+      const d = mk(x, rand(80, 560), { name: n, color: '#ff5a5a' }); d.face = Math.PI; d.stun = 0; d.spd = rand(150, 182); return d;
+    });
+  },
+  focus() { return this.you; },
+  status() { const o = ['', '1ST', '2ND', '3RD', '4TH'][this.down]; return `${this.score} PTS · ${o} DOWN · ${fmt(this.t)}`; },
+  stopPlay(dead) { this.phase = 'dead'; this.dead = dead; },
+  update(dt) {
+    if (this.done) return;
+    this.t = Math.max(0, this.t - dt);
+    const y = this.you;
+    if (this.phase !== 'play') {
+      this.dead -= dt;
+      if (this.dead <= 0) {
+        if (this.t <= 0) { this.done = true; const yds = Math.round(this.yards); this.ctx.finish({ score: this.score, coins: this.score * 4 + Math.floor(yds / 5), summary: `${this.score} pts · ${yds} rushing yds` }); }
+        else this.setup();
+      }
+      return;
+    }
+    this.spinCd -= dt; this.spin -= dt;
+    if (input.pressed && this.spinCd <= 0) { this.spin = 0.4; this.spinCd = 1.6; FX.text(y.x, y.y - 30, 'SPIN', '#52d273', 13); }
+    steer(y, input.x, input.y, this.spin > 0 ? 380 : 235, dt);
+    y.x = clamp(y.x, 20, 1480); y.y = clamp(y.y, 50, 590);
+    for (const d of this.defs) d.claimed = null;
+    for (const b of this.blockers) {
+      if (b.lock && b.lock.stun > 0) { b.x = lerp(b.x, b.lock.x - 22, 0.2); b.y = lerp(b.y, b.lock.y, 0.2); continue; }
+      b.lock = null;
+      let best = null, bd = 1e9;
+      for (const d of this.defs) { if (d.stun > 0 || d.claimed) continue; const s = dist(d, y) + dist(d, b) * 0.5; if (s < bd) { bd = s; best = d; } }
+      if (!best) continue;
+      best.claimed = b;
+      seek(b, best.x, best.y, 215, dt, 2);
+      if (dist(b, best) < 30) { best.stun = 1.8; b.lock = best; FX.burst(best.x, best.y, '#e8ecff', 8, 120); }
+    }
+    for (const d of this.defs) {
+      if (d.stun > 0) { d.stun -= dt; continue; }
+      seek(d, y.x + input.x * 60, y.y + input.y * 60, d.spd, dt, 0);
+      if (dist(d, y) < y.r + d.r - 4) {
+        if (this.spin > 0) { d.stun = 1.2; FX.text(d.x, d.y - 26, 'MISSED', '#ff5a5a', 11); continue; }
+        this.tackle(); return;
+      }
+    }
+    if (y.x >= 1320) {
+      this.yards += (1320 - this.los) / YD; this.score += 7;
+      FX.text(1390, 300, 'TOUCHDOWN', '#52d273', 26); FX.burst(y.x, y.y, '#52d273', 30, 220);
+      this.los = 140; this.down = 1; this.stopPlay(1.6); return;
+    }
+    if (this.t <= 0) this.stopPlay(0.6);
+  },
+  tackle() {
+    const y = this.you, gain = Math.max(0, (y.x - this.los) / YD);
+    this.yards += gain;
+    FX.text(y.x, y.y - 30, `TACKLED +${Math.round(gain)} YDS`, '#e8ecff', 14); FX.burst(y.x, y.y, '#ff5a5a', 14);
+    this.los = clamp(y.x, 140, 1300); this.down++;
+    if (this.down > 4) { FX.text(y.x, y.y - 54, 'TURNOVER ON DOWNS', '#ff5a5a', 14); this.los = 140; this.down = 1; }
+    this.stopPlay(1.2);
+  },
+  draw(g) {
+    g.fillStyle = '#163a22'; g.fillRect(0, 0, 1500, 640);
+    for (let i = 0; i < 20; i++) if (i % 2) { g.fillStyle = '#1a4429'; g.fillRect(140 + i * 59, 40, 59, 560); }
+    g.fillStyle = 'rgba(82,210,115,.28)'; g.fillRect(20, 40, 120, 560); g.fillRect(1320, 40, 140, 560);
+    g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 3; g.strokeRect(20, 40, 1440, 560);
+    g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.35)';
+    g.beginPath(); for (let i = 0; i <= 20; i++) { const x = 140 + i * 59; g.moveTo(x, 40); g.lineTo(x, 600); } g.stroke();
+    g.font = `18px ${FONT_D}`; g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.3)';
+    for (let i = 2; i <= 18; i += 2) { const yd = i <= 10 ? i * 5 : (20 - i) * 5; g.fillText(String(yd), 140 + i * 59, 90); g.fillText(String(yd), 140 + i * 59, 570); }
+    g.save(); g.translate(1390, 320); g.rotate(Math.PI / 2); g.font = `44px ${FONT_D}`; g.fillStyle = 'rgba(232,236,255,.35)'; g.fillText('SWITCHBOARD', 0, 14); g.restore();
+    g.strokeStyle = '#45d4ff'; g.lineWidth = 3; g.beginPath(); g.moveTo(this.los, 40); g.lineTo(this.los, 600); g.stroke();
+    const crew = [...this.defs, ...this.blockers, this.you].sort((a, b) => a.y - b.y);
+    for (const c of crew) {
+      drawChar(g, c);
+      if (c.stun > 0) { g.fillStyle = '#ffd23f'; for (let k = 0; k < 3; k++) { const a = performance.now() / 200 + k * 2.1; g.fillRect(c.x + Math.cos(a) * 12 - 2, c.y - 22 + Math.sin(a) * 4, 4, 4); } }
+    }
+    const y = this.you;
+    g.fillStyle = '#8a4a22'; g.beginPath(); g.ellipse(y.x + Math.cos(y.face + .9) * 14, y.y + Math.sin(y.face + .9) * 14, 7, 4.5, y.face, 0, TAU); g.fill();
+    if (this.spin > 0) { g.strokeStyle = '#52d273'; g.lineWidth = 3; g.beginPath(); g.arc(y.x, y.y, 22, 0, TAU); g.stroke(); }
+  },
+});
+
+/* ======================================================================
+   CARTRIDGE 3: WARZONE (the Call of Duty slot)
+   ====================================================================== */
+OS.register({
+  id: 'warzone', title: 'WARZONE', tagline: 'COD-style squad survival · 60s', color: '#ff4d5e',
+  zoom: 640, world: { w: 1400, h: 1000 }, actionLabel: 'FIRE',
+  hint: 'Hold A to fire (auto-aim). Use the crates as cover. Survive 60 seconds.',
+  drawIcon(g, x, y, s) {
+    g.strokeStyle = '#ff4d5e'; g.lineWidth = 3;
+    g.beginPath(); g.arc(x, y, s * .75, 0, TAU);
+    g.moveTo(x - s, y); g.lineTo(x - s * .3, y); g.moveTo(x + s * .3, y); g.lineTo(x + s, y);
+    g.moveTo(x, y - s); g.lineTo(x, y - s * .3); g.moveTo(x, y + s * .3); g.lineTo(x, y + s); g.stroke();
+    g.fillStyle = '#ff4d5e'; g.beginPath(); g.arc(x, y, 3, 0, TAU); g.fill();
+  },
+  enter(ctx) {
+    this.ctx = ctx; this.done = false; this.t = 0; this.dur = 60; this.score = 0; this.kills = 0; this.hp = 100;
+    this.you = mk(700, 500, ctx.party[0]);
+    this.squad = ctx.party.slice(1).map((p, i) => { const m = mk(700 + (i - 1) * 50, 560, p); m.cd = rand(.3, .8); m.off = { x: (i - 1) * 56, y: 52 }; return m; });
+    this.covers = [
+      { x: 300, y: 250, w: 140, h: 40 }, { x: 960, y: 250, w: 140, h: 40 }, { x: 300, y: 710, w: 140, h: 40 }, { x: 960, y: 710, w: 140, h: 40 },
+      { x: 680, y: 190, w: 40, h: 140 }, { x: 680, y: 670, w: 40, h: 140 }, { x: 520, y: 470, w: 60, h: 60 }, { x: 820, y: 470, w: 60, h: 60 },
+      { x: 110, y: 480, w: 120, h: 40 }, { x: 1170, y: 480, w: 120, h: 40 },
+    ];
+    this.enemies = []; this.bullets = []; this.spawnT = 1; this.fireCd = 0; this.hurt = 0;
+  },
+  focus() { return this.you; },
+  status() { return `HP ${Math.max(0, Math.ceil(this.hp))} · ${this.score} PTS · ${fmt(this.dur - this.t)}`; },
+  collide(c) { for (const r of this.covers) pushOutRect(c, r); c.x = clamp(c.x, 20, 1380); c.y = clamp(c.y, 20, 980); },
+  blocked(b) { return b.x < 0 || b.y < 0 || b.x > 1400 || b.y > 1000 || this.covers.some(r => b.x > r.x && b.x < r.x + r.w && b.y > r.y && b.y < r.y + r.h); },
+  nearest(from, range) { let best = null, bd = range; for (const e of this.enemies) { const d = dist(e, from); if (d < bd) { bd = d; best = e; } } return best; },
+  shot(x, y, a, team, color) {
+    const sp = team === 'enemy' ? 330 : 720;
+    this.bullets.push({ x: x + Math.cos(a) * 16, y: y + Math.sin(a) * 16, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1.3, team, color });
+  },
+  spawn() {
+    const side = Math.floor(rand(0, 4));
+    const x = side === 0 ? 30 : side === 1 ? 1370 : rand(40, 1360);
+    const y = side === 2 ? 30 : side === 3 ? 970 : rand(40, 960);
+    const e = mk(x, y, { name: '', color: '#ff4d5e' });
+    e.hp = 3; e.spd = rand(80, 112); e.cd = rand(1, 2); e.str = rand(0, TAU); e.flash = 0;
+    this.enemies.push(e);
+  },
+  end(reason) {
+    this.done = true;
+    this.ctx.finish({ score: this.score, coins: Math.floor(this.score / 25), summary: `${reason} · ${this.kills} kills · ${this.score} pts` });
+  },
+  update(dt) {
+    if (this.done) return;
+    this.t += dt;
+    const y = this.you;
+    steer(y, input.x, input.y, input.act ? 190 : 230, dt); this.collide(y);
+    for (const m of this.squad) {
+      if (Math.hypot(m.x - (y.x + m.off.x), m.y - (y.y + m.off.y)) > 18) seek(m, y.x + m.off.x, y.y + m.off.y, 240, dt, 10); else m.moving = false;
+      this.collide(m);
+      m.cd -= dt;
+      if (m.cd <= 0) { const e = this.nearest(m, 380); if (e) { m.face = Math.atan2(e.y - m.y, e.x - m.x); this.shot(m.x, m.y, m.face + rand(-.06, .06), 'ally', m.color); } m.cd = rand(.45, .8); }
+    }
+    this.fireCd -= dt;
+    if (input.act && this.fireCd <= 0) {
+      const e = this.nearest(y, 430);
+      if (e) y.face = Math.atan2(e.y - y.y, e.x - y.x);
+      this.shot(y.x, y.y, y.face, 'you', '#45d4ff'); this.fireCd = 0.13;
+    }
+    this.spawnT -= dt;
+    if (this.spawnT <= 0 && this.t < this.dur) { this.spawn(); this.spawnT = Math.max(0.45, 1.5 - this.t * 0.018); }
+    for (const e of this.enemies) {
+      let tgt = y, td = dist(e, y) * 0.8;
+      for (const m of this.squad) { const d = dist(e, m); if (d < td) { td = d; tgt = m; } }
+      const d = dist(e, tgt);
+      if (d > 230) seek(e, tgt.x, tgt.y, e.spd, dt, 0);
+      else { e.str += dt * 0.8; e.x += Math.cos(e.str) * 50 * dt; e.y += Math.sin(e.str) * 50 * dt; e.moving = true; }
+      e.face = Math.atan2(y.y - e.y, y.x - e.x);
+      this.collide(e);
+      e.cd -= dt; e.flash -= dt;
+      if (e.cd <= 0 && dist(e, y) < 420) { e.cd = rand(1.3, 2.4); this.shot(e.x, e.y, e.face + rand(-.09, .09), 'enemy', '#ff9aa4'); }
+    }
+    for (const b of this.bullets) {
+      b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+      if (this.blocked(b)) { b.life = 0; FX.burst(b.x, b.y, '#9aa4c7', 3, 60); continue; }
+      if (b.team === 'enemy') {
+        if (Math.hypot(b.x - y.x, b.y - y.y) < y.r) { b.life = 0; this.hp -= 8; this.hurt = 0.25; FX.burst(y.x, y.y, '#ff4d5e', 6, 90); }
+        continue;
+      }
+      for (const e of this.enemies) {
+        if (e.hp > 0 && Math.hypot(b.x - e.x, b.y - e.y) < e.r + 2) {
+          b.life = 0; e.hp--; e.flash = 0.08;
+          if (e.hp <= 0) {
+            const pts = b.team === 'you' ? 100 : 50;
+            this.score += pts; if (b.team === 'you') this.kills++;
+            FX.burst(e.x, e.y, '#ff4d5e', 16); FX.text(e.x, e.y - 20, `+${pts}`, b.color, 14);
+          }
+          break;
+        }
+      }
+    }
+    this.bullets = this.bullets.filter(b => b.life > 0);
+    this.enemies = this.enemies.filter(e => e.hp > 0);
+    this.hurt -= dt;
+    if (this.hp <= 0) this.end('Down');
+    else if (this.t >= this.dur) { this.score += 500; this.end('Extracted'); }
+  },
+  draw(g) {
+    g.fillStyle = '#1a1417'; g.fillRect(0, 0, 1400, 1000);
+    g.strokeStyle = '#241c21'; g.lineWidth = 1; g.beginPath();
+    for (let x = 0; x <= 1400; x += 70) { g.moveTo(x, 0); g.lineTo(x, 1000); }
+    for (let y = 0; y <= 1000; y += 70) { g.moveTo(0, y); g.lineTo(1400, y); }
+    g.stroke();
+    g.font = `40px ${FONT_D}`; g.textAlign = 'center'; g.fillStyle = 'rgba(255,77,94,.07)'; g.fillText('SWITCHBOARD', 700, 515);
+    for (const r of this.covers) {
+      g.fillStyle = '#3b3036'; g.fillRect(r.x, r.y, r.w, r.h);
+      g.fillStyle = '#54454d'; g.fillRect(r.x, r.y, r.w, 6);
+      g.strokeStyle = '#120e10'; g.lineWidth = 2; g.strokeRect(r.x, r.y, r.w, r.h);
+    }
+    for (const b of this.bullets) {
+      g.strokeStyle = b.color; g.lineWidth = b.team === 'enemy' ? 3 : 2;
+      g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(b.x - b.vx * 0.02, b.y - b.vy * 0.02); g.stroke();
+    }
+    const crew = [...this.enemies, ...this.squad, this.you].sort((a, b) => a.y - b.y);
+    for (const c of crew) {
+      drawChar(g, c, !!c.name);
+      if (c.flash > 0) { g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.arc(c.x, c.y, c.r, 0, TAU); g.fill(); }
+    }
+  },
+  drawHud(g, W, H) {
+    if (this.hurt > 0) {
+      const grad = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .3, W / 2, H / 2, Math.max(W, H) * .7);
+      grad.addColorStop(0, 'rgba(255,77,94,0)'); grad.addColorStop(1, `rgba(255,77,94,${this.hurt * 1.6})`);
+      g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    }
+  },
+});
+
+/* ---------- the open slot: shows how to add a game ---------- */
+const PLUGIN = {
+  id: 'plugin', title: '+ ADD GAME', tagline: 'plug in your own', color: '#9aa4c7',
+  drawIcon(g, x, y, s) { g.font = `${s * 1.1}px ${FONT_D}`; g.textAlign = 'center'; g.fillStyle = '#9aa4c7'; g.fillText('</>', x, y + s * .4); },
+};
+function openPanel() { panel.hidden = false; $('closePanel').focus(); }
+$('closePanel').addEventListener('click', () => { panel.hidden = true; });
+$('leave').addEventListener('click', () => {
+  const s = OS.scene;
+  if (s === Hub) return;
+  s.done = true;
+  OS.go(Hub, { from: s });
+  toast(`Left ${s.title} early · no coins`, s.color);
+});
+
+/* ======================================================================
+   THE PLAZA: the shared world. Portals are built from whatever is registered.
+   ====================================================================== */
+const Hub = {
+  id: 'hub', title: 'THE PLAZA', zoom: 900, world: { w: 1400, h: 1100 }, actionLabel: '',
+  hint: 'Walk your crew into a portal and stand still to load in.',
+  enter(arg = {}) {
+    const slots = [...OS.carts, PLUGIN], n = slots.length, cx = 700, cy = 560, R = 360;
+    this.portals = slots.map((cart, i) => { const a = -Math.PI / 2 + i * TAU / n; return { cart, x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R * 0.82, r: 60, charge: 0 }; });
+    let sx = cx, sy = cy + 40;
+    const from = arg.from && this.portals.find(p => p.cart === arg.from);
+    if (from) { const d = Math.hypot(from.x - cx, from.y - cy); sx = from.x - (from.x - cx) / d * 130; sy = from.y - (from.y - cy) / d * 130; }
+    this.crew = PARTY.map((p, i) => mk(sx + (i ? (i - 2) * 34 : 0), sy + (i ? 44 : 0), p));
+    this.you = this.crew[0];
+    this.trail = []; this.time = 0;
+  },
+  focus() { return this.you; },
+  status() { return ''; },
+  update(dt) {
+    this.time += dt;
+    const y = this.you;
+    steer(y, input.x, input.y, 240, dt);
+    y.x = clamp(y.x, 30, 1370); y.y = clamp(y.y, 30, 1070);
+    const last = this.trail[0];
+    if (!last || Math.hypot(last.x - y.x, last.y - y.y) > 4) { this.trail.unshift({ x: y.x, y: y.y }); if (this.trail.length > 120) this.trail.pop(); }
+    for (let i = 1; i < this.crew.length; i++) {
+      const t = this.trail[i * 11];
+      if (t) seek(this.crew[i], t.x, t.y, 270, dt, 6); else this.crew[i].moving = false;
+    }
+    const still = Math.hypot(input.x, input.y) < 0.2;
+    for (const p of this.portals) {
+      if (dist(p, y) < p.r - 6) {
+        p.charge += dt * (still ? 1.4 : 0.55);
+        if (p.charge >= 1) {
+          p.charge = 0;
+          if (p.cart === PLUGIN) { const a = Math.atan2(560 - p.y, 700 - p.x); y.x += Math.cos(a) * 110; y.y += Math.sin(a) * 110; openPanel(); }
+          else OS.launch(p.cart);
+          return;
+        }
+      } else p.charge = Math.max(0, p.charge - dt * 2);
+    }
+  },
+  draw(g) {
+    g.fillStyle = '#0f1426'; g.fillRect(0, 0, 1400, 1100);
+    g.strokeStyle = '#161e3a'; g.lineWidth = 1; g.beginPath();
+    for (let x = 0; x <= 1400; x += 50) { g.moveTo(x, 0); g.lineTo(x, 1100); }
+    for (let y = 0; y <= 1100; y += 50) { g.moveTo(0, y); g.lineTo(1400, y); }
+    g.stroke();
+    g.lineCap = 'round';
+    for (const p of this.portals) { g.strokeStyle = hexA(p.cart.color, .1); g.lineWidth = 46; g.beginPath(); g.moveTo(700, 560); g.lineTo(p.x, p.y); g.stroke(); }
+    g.lineCap = 'butt';
+    g.fillStyle = '#131a33'; g.beginPath(); g.arc(700, 560, 210, 0, TAU); g.fill();
+    g.strokeStyle = '#2a3566'; g.lineWidth = 3; g.setLineDash([14, 10]); g.lineDashOffset = this.time * 12;
+    g.beginPath(); g.arc(700, 560, 210, 0, TAU); g.stroke();
+    g.lineDashOffset = -this.time * 8; g.beginPath(); g.arc(700, 560, 160, 0, TAU); g.stroke();
+    g.setLineDash([]);
+    g.textAlign = 'center';
+    g.font = `34px ${FONT_D}`; g.fillStyle = '#212c58'; g.fillText('SWITCHBOARD', 700, 556);
+    g.font = `700 13px ${FONT_B}`; g.fillStyle = '#2f3c72'; g.fillText(`ONE SERVER · ${OS.carts.length} GAMES LOADED · ∞ SLOTS`, 700, 584);
+    for (const p of this.portals) {
+      const c = p.cart.color;
+      g.fillStyle = hexA(c, .08 + Math.sin(this.time * 3 + p.x) * .03); g.beginPath(); g.arc(p.x, p.y, p.r + 20, 0, TAU); g.fill();
+      g.fillStyle = hexA(c, .16); g.beginPath(); g.arc(p.x, p.y, p.r, 0, TAU); g.fill();
+      g.setLineDash([10, 8]); g.lineDashOffset = -this.time * 24; g.strokeStyle = c; g.lineWidth = 4;
+      g.beginPath(); g.arc(p.x, p.y, p.r, 0, TAU); g.stroke(); g.setLineDash([]);
+      if (p.charge > 0) { g.strokeStyle = '#ffffff'; g.lineWidth = 7; g.beginPath(); g.arc(p.x, p.y, p.r + 11, -Math.PI / 2, -Math.PI / 2 + TAU * p.charge); g.stroke(); }
+      p.cart.drawIcon(g, p.x, p.y, 24);
+      g.textAlign = 'center';
+      g.font = `20px ${FONT_D}`; g.fillStyle = c; g.fillText(p.cart.title, p.x, p.y + p.r + 34);
+      g.font = `600 13px ${FONT_B}`; g.fillStyle = '#9aa4c7'; g.fillText(p.cart.tagline, p.x, p.y + p.r + 52);
+      const best = profile.best[p.cart.id];
+      if (best) { g.fillStyle = '#ffd23f'; g.fillText(`YOUR BEST ${best}`, p.x, p.y + p.r + 69); }
+    }
+    for (const c of [...this.crew].sort((a, b) => a.y - b.y)) drawChar(g, c);
+  },
+};
+
+/* ---------- render loop ---------- */
+let dpr = 1;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(canvas.clientWidth * dpr);
+  canvas.height = Math.round(canvas.clientHeight * dpr);
+}
+addEventListener('resize', resize);
+
+function drawControls(g, W, H) {
+  if (!touchUI) return;
+  const jx = joy.id !== null ? joy.ox : 90, jy = joy.id !== null ? joy.oy : H - 120;
+  g.fillStyle = 'rgba(232,236,255,.08)'; g.strokeStyle = 'rgba(232,236,255,.25)'; g.lineWidth = 2;
+  g.beginPath(); g.arc(jx, jy, 52, 0, TAU); g.fill(); g.stroke();
+  const kx = joy.id !== null ? jx + input.x * 40 : jx, ky = joy.id !== null ? jy + input.y * 40 : jy;
+  g.fillStyle = 'rgba(232,236,255,.3)'; g.beginPath(); g.arc(kx, ky, 22, 0, TAU); g.fill();
+  const label = OS.scene.actionLabel;
+  if (!label) return;
+  const bx = W - 86, by = H - 120;
+  g.fillStyle = btn.id !== null ? hexA(OS.scene.color, .55) : hexA(OS.scene.color, .25);
+  g.strokeStyle = OS.scene.color; g.lineWidth = 3;
+  g.beginPath(); g.arc(bx, by, 44, 0, TAU); g.fill(); g.stroke();
+  g.fillStyle = '#e8ecff'; g.textAlign = 'center';
+  g.font = `20px ${FONT_D}`; g.fillText('A', bx, by + 2);
+  g.font = `700 10px ${FONT_B}`; g.fillText(label, bx, by + 18);
+}
+
+function render() {
+  const s = OS.scene, W = canvas.clientWidth, H = canvas.clientHeight;
+  const scale = Math.min(W, H) / (s.zoom || 600);
+  const vw = W / scale, vh = H / scale, f = s.focus();
+  const cx = s.world.w <= vw ? s.world.w / 2 : clamp(f.x, vw / 2, s.world.w - vw / 2);
+  const cy = s.world.h <= vh ? s.world.h / 2 : clamp(f.y, vh / 2, s.world.h - vh / 2);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#0b0e1a'; g.fillRect(0, 0, W, H);
+  g.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (W / 2 - cx * scale), dpr * (H / 2 - cy * scale));
+  s.draw(g);
+  FX.draw(g);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (s.drawHud) s.drawHud(g, W, H);
+  drawControls(g, W, H);
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  readInput();
+  if (panel.hidden) OS.scene.update(dt);
+  FX.update(dt);
+  ui.frame();
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
+OS.go(Hub, {});
+requestAnimationFrame(frame);
+
+// expose the kernel so you can poke at it from the browser console
+window.OS = OS;
+})();
+</script>
