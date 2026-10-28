@@ -1,0 +1,263 @@
+<title>Switchboard Roadmap</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow reading column like a level-select screen; phases run down a lit "track" on the left. Single dark arcade look, matching the game. */
+:root {
+  --bg: #0b0e1a;
+  --panel: #121830;
+  --line: #26305a;
+  --ink: #e8ecff;
+  --muted: #9aa4c7;
+  --hub: #45d4ff;
+  --hoops: #ff8a3d;
+  --grid: #52d273;
+  --war: #ff4d5e;
+  --gold: #ffd23f;
+  --font-display: "Bungee", Impact, sans-serif;
+  --font-body: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55; }
+.wrap {
+  max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px;
+  padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2, h3 { margin: 0; text-wrap: balance; font-weight: 400; }
+h1 { font-family: var(--font-display); font-size: clamp(30px, 8vw, 52px); line-height: 1.02; color: var(--ink); }
+h1 span { color: var(--hub); }
+h2 { font-family: var(--font-display); font-size: 22px; color: var(--hub); }
+h3 { font-weight: 700; font-size: 18px; }
+p { margin: 0; max-width: 65ch; }
+.eyebrow { font-weight: 700; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 18px; color: var(--muted); }
+section { display: flex; flex-direction: column; gap: 16px; }
+.dim { color: var(--muted); }
+b.hi { color: var(--gold); font-weight: 700; }
+
+/* the wall vs the leap */
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.split > div { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--panel); }
+.split ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.tag { font-weight: 700; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+.yes .tag { color: var(--grid); }
+.no .tag { color: var(--war); }
+
+/* mod family tree */
+.tree { display: flex; flex-direction: column; gap: 10px; }
+.lineage { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.node { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-weight: 600; font-size: 14px; background: var(--panel); }
+.node small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: .06em; }
+.node.mod { border-color: var(--gold); }
+.node.big { border-color: var(--hub); color: var(--hub); }
+.arrow { color: var(--muted); font-family: var(--font-mono); }
+
+/* phase track */
+.track { display: flex; flex-direction: column; gap: 0; }
+.phase { position: relative; display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding-bottom: 28px; }
+.phase::before { content: ""; position: absolute; left: 21px; top: 44px; bottom: 0; width: 2px; background: var(--line); }
+.phase:last-child::before { display: none; }
+.dot { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--c, var(--line)); display: grid; place-items: center; font-family: var(--font-display); font-size: 16px; color: var(--c, var(--muted)); background: var(--bg); position: relative; z-index: 1; }
+.phase.done .dot { background: var(--c); color: var(--bg); }
+.body { min-width: 0; display: flex; flex-direction: column; gap: 10px; padding-top: 6px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.when { font-family: var(--font-mono); font-size: 12px; color: var(--c, var(--muted)); border: 1px solid currentColor; border-radius: 4px; padding: 1px 6px; }
+.facts { display: grid; grid-template-columns: 92px 1fr; gap: 6px 12px; font-size: 14px; }
+.facts dt { font-weight: 700; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+.facts dd { margin: 0; min-width: 0; }
+@media (max-width: 420px) { .facts { grid-template-columns: 1fr; gap: 2px; } .facts dd { margin-bottom: 8px; } }
+
+/* architecture */
+.arch { overflow-x: auto; }
+.arch-inner { min-width: 520px; display: flex; flex-direction: column; gap: 10px; align-items: stretch; font-size: 14px; }
+.row { display: flex; gap: 8px; justify-content: center; }
+.box { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; text-align: center; background: var(--panel); flex: 1; }
+.box b { display: block; font-family: var(--font-display); font-weight: 400; font-size: 13px; }
+.box.kernel { border: 2px solid var(--hub); }
+.box.kernel b { color: var(--hub); font-size: 16px; }
+.down { text-align: center; color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+
+/* table */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; background: var(--panel); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-family: var(--font-display); font-size: 13px; white-space: nowrap; }
+
+.next { border: 2px solid var(--hub); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px; background: var(--panel); }
+a { color: var(--hub); }
+@media (prefers-reduced-motion: no-preference) {
+  .phase.now .dot { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(69,212,255,.15); } }
+}
+</style>
+
+<main class="wrap">
+  <header style="display:flex;flex-direction:column;gap:14px">
+    <span class="eyebrow">Switchboard · build plan</span>
+    <h1>One world.<br>Every game.<br><span>Here's the road.</span></h1>
+    <p class="lede">How to go from the browser prototype you played today to a shared world where your crew walks between a hooper, a football game and a shooter without leaving.</p>
+  </header>
+
+  <section>
+    <h2>What AI changes</h2>
+    <p>You're right that AI moved fast. A solo founder with AI can now build what used to need a 20-person studio for the first year. One thing hasn't moved, though, and the whole plan is designed around it.</p>
+    <div class="split">
+      <div class="yes">
+        <span class="tag">What AI makes possible now</span>
+        <ul>
+          <li>Writing the engine, netcode and game rules (me)</li>
+          <li>Prototyping a new game mode in a day instead of months</li>
+          <li>Generating 3D models, textures and animations from text or video</li>
+          <li>Smart teammates and opponents that play like people</li>
+          <li>One person running what used to need a whole studio</li>
+        </ul>
+      </div>
+      <div class="no">
+        <span class="tag">What it can't do</span>
+        <ul>
+          <li>Take the actual Madden, 2K or COD and merge them. Their code and assets belong to EA, Take-Two and Microsoft</li>
+          <li>Ship ripped game files without getting taken down and sued</li>
+          <li>Make a jailbroken console into a business. Sony patches it, and selling it is illegal</li>
+        </ul>
+      </div>
+    </div>
+    <p>Steve showing up in GTA 5 is a mod: a fan's personal copy, tolerated because nobody sells it. That's a great way to learn, but it can't be the product. <b class="hi">The play is to build your own games in those genres, inside your own world.</b> The brands come later, once you have the players.</p>
+  </section>
+
+  <section>
+    <h2>The modder's road</h2>
+    <p>Gaming history backs this plan. The biggest genres started as mods of someone else's game, then broke out as original games:</p>
+    <div class="tree">
+      <div class="lineage"><span class="node">Half-Life<small>1998</small></span><span class="arrow">→</span><span class="node mod">Counter-Strike mod<small>1999</small></span><span class="arrow">→</span><span class="node big">Counter-Strike<small>its own franchise</small></span></div>
+      <div class="lineage"><span class="node">Warcraft III<small>2002</small></span><span class="arrow">→</span><span class="node mod">DotA custom map<small>2003</small></span><span class="arrow">→</span><span class="node big">League &amp; Dota 2<small>the MOBA genre</small></span></div>
+      <div class="lineage"><span class="node">Arma 2 / 3</span><span class="arrow">→</span><span class="node mod">Battle royale mods<small>early 2010s</small></span><span class="arrow">→</span><span class="node big">PUBG → Fortnite BR<small>2017</small></span></div>
+    </div>
+    <p class="dim">The pattern: prove the idea fast, then rebuild it as something you own. Switchboard follows the same path.</p>
+  </section>
+
+  <section>
+    <h2>The build, phase by phase</h2>
+    <div class="track">
+
+      <div class="phase done" style="--c: var(--grid)">
+        <div class="dot">✓</div>
+        <div class="body">
+          <div class="head"><h3>Prove the concept</h3><span class="when">DONE</span></div>
+          <p>The browser prototype: a plaza, a crew that follows you, three plug-in games and one shared wallet.</p>
+          <dl class="facts">
+            <dt>Proves</dt><dd>The kernel + cartridge design works. A new game is about 150 lines.</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="phase now" style="--c: var(--hub)">
+        <div class="dot">1</div>
+        <div class="body">
+          <div class="head"><h3>Real friends, real party</h3><span class="when">WEEKS 1–4</span></div>
+          <p>DRE, MIA and KAI become four real people. Make a party code, text it to your friends, and everyone's in the plaza together.</p>
+          <dl class="facts">
+            <dt>Build</dt><dd>Game server (Node.js + WebSockets), party codes, everyone's moves synced, voice chat later</dd>
+            <dt>Milestone</dt><dd>4 phones in one Hoops game, scores counting for the whole team</dd>
+            <dt>You learn</dt><dd>Client vs. server, and why the server is the referee (anti-cheat starts here)</dd>
+            <dt>Cost</dt><dd>Free to about $20/month in hosting (estimate)</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="phase" style="--c: var(--hoops)">
+        <div class="dot">2</div>
+        <div class="body">
+          <div class="head"><h3>Go 3D</h3><span class="when">MONTHS 1–3</span></div>
+          <p>Rebuild the plaza and the games in 3D while staying in the browser, so joining is still just tapping a link. No download means faster growth.</p>
+          <dl class="facts">
+            <dt>Build</dt><dd>Three.js world, a third-person camera, AI-generated 3D characters and courts</dd>
+            <dt>Milestone</dt><dd>Walk through a 3D city into a 3D court and shoot on a real hoop</dd>
+            <dt>You learn</dt><dd>3D coordinates, cameras, animation, and how an engine draws a frame</dd>
+            <dt>Later move</dt><dd>Unreal or Godot for console-level graphics. The cartridge rules carry over unchanged.</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="phase" style="--c: var(--war)">
+        <div class="dot">3</div>
+        <div class="body">
+          <div class="head"><h3>Three games people replay</h3><span class="when">MONTHS 3–9</span></div>
+          <p>This phase decides whether Switchboard makes it. Every game has to be fun enough to keep people coming back. That takes depth, not more games.</p>
+          <dl class="facts">
+            <dt>Build</dt><dd>Real 2v2/3v3 basketball, 7-on-7 football, squad shooter. Ranked modes. One account, one avatar, one inventory across all three.</dd>
+            <dt>Milestone</dt><dd>100 players who come back every week without being asked</dd>
+            <dt>You learn</dt><dd>Game feel, balancing, and reading player data</dd>
+            <dt>Help needed</dt><dd>A contract 3D artist/animator, plus friends playtesting every week</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="phase" style="--c: var(--gold)">
+        <div class="dot">4</div>
+        <div class="body">
+          <div class="head"><h3>Open the doors to creators</h3><span class="when">YEAR 1–2</span></div>
+          <p>This is the Linux moment. Publish the cartridge rules so anyone can build a game into the world: kart racing, golf, fighting, horror. Each one gets a building in the city.</p>
+          <dl class="facts">
+            <dt>Build</dt><dd>A creator kit, sandboxing so a bad game can't crash the world, a revenue share for creators</dd>
+            <dt>Milestone</dt><dd>A game you didn't make becomes the most-played building in the city</dd>
+            <dt>Model</dt><dd>How Roblox and Fortnite Creative grew from a handful of modes to millions of games</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="phase" style="--c: var(--muted)">
+        <div class="dot">5</div>
+        <div class="body">
+          <div class="head"><h3>The brands come to you</h3><span class="when">ONCE YOU HAVE PLAYERS</span></div>
+          <p>With a real audience, licensing becomes a business deal instead of a lawsuit. Leagues and publishers chase players. Fortnite already sells NFL and NBA gear, and Roblox has league-licensed games.</p>
+          <dl class="facts">
+            <dt>Build</dt><dd>Real teams and athletes (league + players' association licenses), publisher partnerships, an official building for a big franchise</dd>
+            <dt>Milestone</dt><dd>A major sports or shooter brand opens an official venue in your city</dd>
+          </dl>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>What the system looks like</h2>
+    <p class="dim">The same shape as today's prototype, with real servers under it.</p>
+    <div class="arch"><div class="arch-inner">
+      <div class="row"><div class="box"><b>YOU</b>phone / PC / console</div><div class="box"><b>DRE</b></div><div class="box"><b>MIA</b></div><div class="box"><b>KAI</b></div></div>
+      <div class="down">▼ one connection, one login ▼</div>
+      <div class="row"><div class="box kernel"><b>THE KERNEL</b>party · voice · account · wallet · inventory · matchmaking · the city</div></div>
+      <div class="down">▼ plug-in rules: enter → update → draw → finish ▼</div>
+      <div class="row">
+        <div class="box"><b style="color:var(--hoops)">HOOPS</b>basketball</div>
+        <div class="box"><b style="color:var(--grid)">GRIDIRON</b>football</div>
+        <div class="box"><b style="color:var(--war)">WARZONE</b>shooter</div>
+        <div class="box"><b style="color:var(--gold)">+ ANYONE</b>creator games</div>
+      </div>
+    </div></div>
+  </section>
+
+  <section>
+    <h2>Who does what</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Role</th><th>Phase 1–2</th><th>Phase 3+</th></tr></thead>
+      <tbody>
+        <tr><td style="color:var(--gold)">You</td><td>Vision, game design, testing every build, recruiting your friend group as the first players</td><td>Founder: community, creators, partnerships, raising money</td></tr>
+        <tr><td style="color:var(--hub)">Claude</td><td>Engine, server, game code, tools, explaining each piece so you understand it</td><td>Same, plus the creator kit and backend systems</td></tr>
+        <tr><td style="color:var(--muted)">Others</td><td>Nobody yet</td><td>3D artist/animator, eventually a small team and a lawyer</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="next">
+    <span class="eyebrow" style="color:var(--hub)">Next move</span>
+    <h3>Phase 1: make the party real</h3>
+    <p>I can build the multiplayer server and party codes next, so you and three friends can be in the same plaza on your phones. Everything I build gets explained as I go, so you learn how it works and don't just own it.</p>
+  </section>
+</main>
